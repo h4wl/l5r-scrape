@@ -11,7 +11,6 @@ homepage.LoadHtml(homepageHtml);
 var topMenuNodes = homepage.DocumentNode.SelectNodes("//div[@id = 'top-bar']/ul/li");
 var topMenu = new List<TopMenuItem>();
 
-
 foreach (var n in topMenuNodes)
 {
     var a = n.ChildNodes.FirstOrDefault(x => x.Name == "a");
@@ -32,8 +31,7 @@ foreach (var n in topMenuNodes)
                 Title = childLink.InnerText,
                 Path = childLink.GetAttributeValue("href", string.Empty)
             });
-        }
-        
+        }   
     }
 
     topMenu.Add(new TopMenuItem {
@@ -44,6 +42,19 @@ foreach (var n in topMenuNodes)
 }
 
 Console.WriteLine(JsonSerializer.Serialize(topMenu));
+
+var sideMenuNodes = homepage.DocumentNode.SelectNodes("//div[@id = 'side-bar']/p[text() = 'More pages']/following-sibling::ul/li/a");
+var sideMenu = new List<MenuItem>();
+
+foreach (var a in sideMenuNodes)
+{
+    sideMenu.Add(new MenuItem {
+        Title = a.InnerText,
+        Path = a.GetAttributeValue("href", string.Empty)
+    });
+}
+
+Console.WriteLine(JsonSerializer.Serialize(sideMenu));
 
 
 static async Task<string> CallUrl(string fullUrl)
