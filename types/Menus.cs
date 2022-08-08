@@ -1,5 +1,15 @@
 using System.Text.Json.Serialization;
 
+public class TopMenu
+{
+    public TopMenuItem[] MenuItems { get; set; }
+}
+
+public class GenericMenu
+{
+    public MenuItem[] MenuItems { get; set; }
+}
+
 public class MenuItem
 {
     [JsonPropertyOrder(1)]

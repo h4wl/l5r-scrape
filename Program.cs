@@ -31,7 +31,7 @@ static async Task SerializeToOutputFolder<T>(string fileName, T value)
 static async Task ScrapeTopMenu(HtmlDocument doc)
 {
     var topMenuNodes = doc.DocumentNode.SelectNodes("//div[@id = 'top-bar']/ul/li");
-    var topMenu = new List<TopMenuItem>();
+    var topMenuItems = new List<TopMenuItem>();
 
     foreach (var n in topMenuNodes)
     {
@@ -56,13 +56,15 @@ static async Task ScrapeTopMenu(HtmlDocument doc)
             }   
         }
 
-        topMenu.Add(new TopMenuItem {
+        topMenuItems.Add(new TopMenuItem {
             Path = path,
             Title = a.InnerText,
             Children = children.ToArray()
         });
     }
-
+    var topMenu = new TopMenu {
+        MenuItems = topMenuItems.ToArray()
+    };
     await SerializeToOutputFolder("topMenu.json", topMenu);
 
 }
@@ -70,15 +72,19 @@ static async Task ScrapeTopMenu(HtmlDocument doc)
 static async Task ScrapeSideMenu(HtmlDocument doc)
 {
     var sideMenuNodes = doc.DocumentNode.SelectNodes("//div[@id = 'side-bar']/p[text() = 'More pages']/following-sibling::ul/li/a");
-    var sideMenu = new List<MenuItem>();
+    var sideMenuItems = new List<MenuItem>();
 
     foreach (var a in sideMenuNodes)
     {
-        sideMenu.Add(new MenuItem {
+        sideMenuItems.Add(new MenuItem {
             Title = a.InnerText,
             Path = a.GetAttributeValue("href", string.Empty)
         });
     }
+
+    var sideMenu = new GenericMenu {
+        MenuItems = sideMenuItems.ToArray() 
+    };
 
     await SerializeToOutputFolder("sideMenu.json", sideMenu);
 
