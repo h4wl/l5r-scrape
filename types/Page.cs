@@ -1,3 +1,7 @@
+public class Page
+{
+    public TableOfContents TableOfContents { get; set; }
+}
 
 public class TableOfContents
 {

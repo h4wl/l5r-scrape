@@ -27,15 +27,18 @@ foreach (var page in allLinkedPages)
 }
 
 
-foreach (var page in allLinkedPages)
+foreach (var pageUrl in allLinkedPages)
 {
+    var pageName = pageUrl.Remove(0, 1);
     var doc = new HtmlDocument();
-    if (page == "/history")
+    if (pageUrl == "/history")
     {
-        var pageHtml = await CallUrl(page);
+        var pageHtml = await CallUrl(pageUrl);
         doc.LoadHtml(pageHtml);
         var tocNodes = doc.DocumentNode.SelectNodes("//div[@id = 'toc-list']/div");
         var hasToc = tocNodes.Count > 0;
+
+        var page = new Page();
 
         if (hasToc)
         {
@@ -50,6 +53,9 @@ foreach (var page in allLinkedPages)
                 var a = n.ChildNodes.FirstOrDefault(x => x.Name == "a");
                 var title = a.InnerText;
                 var link = a.GetAttributeValue("href", string.Empty);
+
+                link = $"/l5r/{pageName}{link}";
+
                 var entry = new TableOfContents.Entry {
                     Title = title,
                     Link = link
@@ -78,13 +84,15 @@ foreach (var page in allLinkedPages)
             }
             toc.Entries = entries.ToArray();
 
+            page.TableOfContents = toc;
+
             using var sw = new StringWriter();
-            sw.WriteLine(SerializeIndented(toc));
-            sw.WriteLine("---");
             sw.WriteLine("# test");
 
+            
 
-            await WriteToOutputFolder($"{page.Remove(0, 1)}.md", sw.ToString());
+            await WriteToOutputFolder($"_{pageName}.json", SerializeIndented(page));
+            await WriteToOutputFolder($"{pageName}.md", sw.ToString());
         }
     }
 }
@@ -107,6 +115,8 @@ static async Task WriteToOutputFolder(string fileName, string text)
 {
     string outputFolder = @"output";
     Directory.CreateDirectory(outputFolder);
+    string dataFolder = $"{outputFolder}/data";
+    Directory.CreateDirectory(dataFolder);
     await File.WriteAllTextAsync(Path.Combine(outputFolder, fileName), text);
 }
 
@@ -155,7 +165,7 @@ static async Task<List<string>> ScrapeTopMenu(HtmlDocument doc)
     var topMenu = new TopMenu {
         MenuItems = topMenuItems.ToArray()
     };
-    await SerializeToOutputFolder("topMenu.json", topMenu);
+    await SerializeToOutputFolder("data/topMenu.json", topMenu);
     return linkedPages.Distinct().ToList();
 }
 
@@ -178,6 +188,6 @@ static async Task<List<string>> ScrapeSideMenu(HtmlDocument doc)
         MenuItems = sideMenuItems.ToArray() 
     };
 
-    await SerializeToOutputFolder("sideMenu.json", sideMenu);
+    await SerializeToOutputFolder("data/sideMenu.json", sideMenu);
     return linkedPages.Distinct().ToList();
 }
