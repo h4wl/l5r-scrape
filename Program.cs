@@ -4,9 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
 
-
-await WriteToOutputFolder("index.md", "Placeholder");
-
 var homepageHtml = await CallUrl();
 
 var homepage = new HtmlDocument();
@@ -246,6 +243,10 @@ static async Task<List<string>> ScrapePage(string pageUrl)
 
 
     using var sw = new StringWriter();
+
+    var titleNode = doc.DocumentNode.SelectSingleNode("//div[@id = 'page-title']");
+
+    sw.WriteLine($"Title: {titleNode.InnerText.Trim()}");
 
     //Nothing below "---" will attempt to be parsed by Statiq
     sw.WriteLine("---");
