@@ -181,8 +181,8 @@ static async Task<List<string>> ScrapePage(string pageUrl)
 
     var pageName = pageUrl.Remove(0, 1);
     var doc = new HtmlDocument();
-    //if (pageUrl == "/history")
-    //{
+    // if (pageUrl == "/history")
+    // {
     var pageHtml = await CallUrl(pageUrl);
     doc.LoadHtml(pageHtml);
     var tocNodes = doc.DocumentNode.SelectNodes("//div[@id = 'toc-list']/div");
@@ -249,6 +249,59 @@ static async Task<List<string>> ScrapePage(string pageUrl)
 
     //Nothing below "---" will attempt to be parsed by Statiq
     sw.WriteLine("---");
+
+#region ParseToC
+    if (page.TableOfContents?.Entries != null)
+    {
+        var tocElement = new XElement("ul");
+        foreach (var entry in page.TableOfContents.Entries)
+        {
+            var entryElement = new XElement("li",
+                new XElement("a",
+                    new XAttribute("href", entry.Link),
+                    entry.Title
+                )
+            );
+            if (entry.Children != null && entry.Children.Count() > 0)
+            {
+                var tocElement2 = new XElement("ul");
+                foreach (var entry2 in entry.Children)
+                {
+                    var entryElement2 = new XElement("li",
+                        new XElement("a",
+                            new XAttribute("href", entry2.Link),
+                            entry2.Title
+                        )
+                    );
+                    if (entry2.Children != null && entry2.Children.Count() > 0)
+                    {
+                        var tocElement3 = new XElement("ul");
+                        foreach (var entry3 in entry2.Children)
+                        {
+                            var entryElement3 = new XElement("li",
+                                new XElement("a",
+                                    new XAttribute("href", entry3.Link),
+                                    entry3.Title
+                                )
+                            );
+                            
+                            tocElement3.Add(entryElement3);
+                        }
+                        entryElement2.Add(tocElement3);
+                    }
+                    tocElement2.Add(entryElement2);
+                }
+                entryElement.Add(tocElement2);
+            }
+            tocElement.Add(entryElement);
+        }
+
+        sw.WriteLine();
+        sw.WriteLine(tocElement);
+        sw.WriteLine();
+    }
+#endregion
+
     var linkNodes = doc.DocumentNode.SelectNodes("//div[@id = 'page-content']/descendant::a");
     if (linkNodes != null)
     {
@@ -429,9 +482,6 @@ static async Task<List<string>> ScrapePage(string pageUrl)
 
     }
 
-
-
-    await WriteToOutputFolder($"_{pageName}.json", SerializeIndented(page));
     await WriteToOutputFolder($"{pageName}.md", sw.ToString());
 
     Console.WriteLine($"Scraped {pageUrl}");
