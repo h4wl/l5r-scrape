@@ -86,14 +86,57 @@ foreach (var pageUrl in allLinkedPages)
 
             page.TableOfContents = toc;
 
-            using var sw = new StringWriter();
-            sw.WriteLine("# test");
-
             
-
-            await WriteToOutputFolder($"_{pageName}.json", SerializeIndented(page));
-            await WriteToOutputFolder($"{pageName}.md", sw.ToString());
         }
+
+        using var sw = new StringWriter();
+
+        var pageContentNodes = doc.DocumentNode.SelectNodes("//div[@id = 'page-content']/*");
+        for (int i = 0; i < pageContentNodes.Count; i++)
+        {
+            var node = pageContentNodes[i];
+            var nodeName = node.Name;
+            if (i == 0 && nodeName == "table") continue;
+            
+            
+            var linePrefix = string.Empty;
+            var lineSuffix = string.Empty;
+
+            if (nodeName == "h1") linePrefix = "# ";
+            if (nodeName == "h2") linePrefix = "## ";
+            if (nodeName == "h3") linePrefix = "### ";
+            
+            if (nodeName == "ul")
+            {
+                foreach (var item in node.ChildNodes)
+                {
+                    if (item.Name == "li")
+                    {
+                        sw.WriteLine($"- {item.InnerText}");
+                    }
+                }
+                sw.WriteLine();
+                continue;
+            }
+
+
+            var rawId = node.GetAttributeValue("id", string.Empty);
+
+            if (rawId.Length > 0)
+            {
+                lineSuffix = $" {{#{rawId}}}";
+            }
+
+
+            sw.WriteLine($"{linePrefix}{node.InnerText}{lineSuffix}");
+            sw.WriteLine();
+
+        }
+
+        
+
+        await WriteToOutputFolder($"_{pageName}.json", SerializeIndented(page));
+        await WriteToOutputFolder($"{pageName}.md", sw.ToString());
     }
 }
 
