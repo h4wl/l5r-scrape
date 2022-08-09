@@ -20,15 +20,14 @@ var sideMenuLinkedPages = await ScrapeSideMenu(homepage);
 Thread.Sleep(1000);
 
 var allLinkedPages = topMenuLinkedPages.Union(sideMenuLinkedPages).ToList();
-//Console.WriteLine($"Both Menus links to {allLinkedPages.Count()}");
+
 allLinkedPages.Sort((x, y) => string.Compare(x, y));
 // foreach (var page in allLinkedPages)
 // {
 //     Console.WriteLine(page);
 // }
 
-allLinkedPages = allLinkedPages.Take(1).ToList();
-
+Console.WriteLine($"Initial Menus link to {allLinkedPages.Count()} pages.");
 
 foreach (var pageUrl in allLinkedPages)
 {
@@ -97,6 +96,19 @@ foreach (var pageUrl in allLinkedPages)
 
     //Nothing below "---" will attempt to be parsed by Statiq
     sw.WriteLine("---");
+    var linkNodes = doc.DocumentNode.SelectNodes("//div[@id = 'page-content']/descendant::a");
+    if (linkNodes != null)
+    {
+        foreach (var a in linkNodes)
+        {
+            var link = a.GetAttributeValue("href", string.Empty);
+            if (link.StartsWith("/"))
+            {
+                a.SetAttributeValue("href", $"/l5r{link}");
+            }
+        }
+    }
+    
     var pageContentNodes = doc.DocumentNode.SelectNodes("//div[@id = 'page-content']/*");
     for (int i = 0; i < pageContentNodes.Count; i++)
     {
@@ -108,9 +120,9 @@ foreach (var pageUrl in allLinkedPages)
         var linePrefix = string.Empty;
         var lineSuffix = string.Empty;
 
-        if (nodeName == "h1") linePrefix = "# ";
-        if (nodeName == "h2") linePrefix = "## ";
-        if (nodeName == "h3") linePrefix = "### ";
+        if (nodeName == "h1") linePrefix = "## ";
+        if (nodeName == "h2") linePrefix = "### ";
+        if (nodeName == "h3") linePrefix = "#### ";
 
         if (nodeName == "ul")
         {
@@ -118,7 +130,7 @@ foreach (var pageUrl in allLinkedPages)
             {
                 if (item.Name == "li")
                 {
-                    sw.WriteLine($"- {item.InnerText}");
+                    sw.WriteLine($"- {item.InnerHtml}");
                 }
             }
             sw.WriteLine();
@@ -148,8 +160,54 @@ foreach (var pageUrl in allLinkedPages)
                     && node.ChildNodes[1].Name == "br"
                     && node.ChildNodes[2].Name == "#text")
                 {
-                    sw.WriteLine($"#### {node.ChildNodes[0].InnerText}");
-                    sw.WriteLine($"{node.ChildNodes[2].InnerText}");
+
+                    sw.WriteLine($"##### {node.ChildNodes[0].InnerHtml}");
+                    sw.WriteLine($"{node.ChildNodes[2].InnerHtml}");
+                    continue;
+                }
+            }
+            
+            if (childCount > 3)
+            {
+                var firstIsDecoration = false;
+                if (node.ChildNodes[0].Name == "span")
+                {
+                    var style = node.ChildNodes[0].GetAttributeValue("style", string.Empty);
+                    if (style == "text-decoration: underline;")
+                    {
+                        firstIsDecoration = true;
+                    }
+                }
+                else if (node.ChildNodes[0].Name == "strong")
+                {
+                    firstIsDecoration = true;
+                }
+
+                if (firstIsDecoration)
+                {
+                    sw.WriteLine($"##### {node.ChildNodes[0].InnerHtml}");
+
+                    if (node.ChildNodes[0].InnerHtml.Contains("Chikushudo"))
+                    {
+                        
+                    }
+                    var remainingNodes = node.ChildNodes.ToList();
+                    remainingNodes.RemoveAt(0);
+                    foreach (var item in remainingNodes)
+                    {
+                        if (item.Name == "br")
+                        {
+                            continue;
+                        }
+                        if (item.Name == "strong")
+                        {
+                            sw.WriteLine($"###### {item.InnerHtml.TrimStart()}");
+                        }
+                        else
+                        {
+                            sw.WriteLine($"{item.OuterHtml}");
+                        }
+                    }
                     continue;
                 }
             }
@@ -161,12 +219,46 @@ foreach (var pageUrl in allLinkedPages)
                     var style = node.ChildNodes[0].GetAttributeValue("style", string.Empty);
                     if (style == "text-decoration: underline;")
                     {
-                        sw.WriteLine($"##### {node.ChildNodes[0].InnerText}");
+                        sw.WriteLine($"###### {node.ChildNodes[0].InnerHtml}");
                         continue;
                     }
                 }
+
+                if (node.ChildNodes[0].Name == "strong")
+                {
+                    sw.WriteLine($"###### {node.ChildNodes[0].InnerHtml}");
+                    continue;
+                }
                 
             }
+        }
+
+        if (pageName == "bushido" && nodeName == "blockquote")
+        {
+            var text = node.InnerText;
+            text = text.Replace("&quot;", string.Empty);
+            text = text.Replace("- Akodo's Leadership", string.Empty);
+
+            //sw.WriteLine("***");
+            sw.WriteLine(new XElement("figure",
+                new XAttribute("class", "text-center"),
+                new XElement("blockquote",
+                    new XAttribute("class", "blockquote"),
+                    new XElement("p", text)
+                ),
+                new XElement("figcaption",
+                    new XAttribute("class", "blockquote-footer"),
+                    "Kami Akodo in ",
+                    new XElement("cite",
+                        new XAttribute("title", "Leadership"),
+                        "Leadership"
+                    )
+                    
+                )
+            ));
+            sw.WriteLine();
+            //sw.WriteLine("***");
+            continue;
         }
 
 
@@ -178,7 +270,7 @@ foreach (var pageUrl in allLinkedPages)
         }
 
 
-        sw.WriteLine($"{linePrefix}{node.InnerText}{lineSuffix}");
+        sw.WriteLine($"{linePrefix}{node.InnerHtml}{lineSuffix}");
         sw.WriteLine();
 
     }
