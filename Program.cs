@@ -77,7 +77,14 @@ foreach (var page in allLinkedPages)
                 }
             }
             toc.Entries = entries.ToArray();
-            await SerializeToOutputFolder($"{page.Remove(0, 1)}.json", toc);
+
+            using var sw = new StringWriter();
+            sw.WriteLine(SerializeIndented(toc));
+            sw.WriteLine("---");
+            sw.WriteLine("# test");
+
+
+            await WriteToOutputFolder($"{page.Remove(0, 1)}.md", sw.ToString());
         }
     }
 }
@@ -91,11 +98,21 @@ static async Task<string> CallUrl(string page = "")
 	return response;
 }
 
-static async Task SerializeToOutputFolder<T>(string fileName, T value)
+static string SerializeIndented<T>(T value)
+{
+    return JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true});
+}
+
+static async Task WriteToOutputFolder(string fileName, string text)
 {
     string outputFolder = @"output";
     Directory.CreateDirectory(outputFolder);
-    await File.WriteAllTextAsync(Path.Combine(outputFolder, fileName), JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true}));
+    await File.WriteAllTextAsync(Path.Combine(outputFolder, fileName), text);
+}
+
+static async Task SerializeToOutputFolder<T>(string fileName, T value)
+{
+    await WriteToOutputFolder(fileName, SerializeIndented(value));
 }
 
 static async Task<List<string>> ScrapeTopMenu(HtmlDocument doc)
