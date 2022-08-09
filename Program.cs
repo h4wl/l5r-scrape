@@ -5,6 +5,7 @@ using System.Linq;
 using System.Xml.Linq;
 
 
+await WriteToOutputFolder("index.md", "Placeholder");
 
 var homepageHtml = await CallUrl();
 
@@ -22,270 +23,56 @@ Thread.Sleep(1000);
 var allLinkedPages = topMenuLinkedPages.Union(sideMenuLinkedPages).ToList();
 
 allLinkedPages.Sort((x, y) => string.Compare(x, y));
-// foreach (var page in allLinkedPages)
-// {
-//     Console.WriteLine(page);
-// }
 
 Console.WriteLine($"Initial Menus link to {allLinkedPages.Count()} pages.");
 
+
+var discoveredPages = new List<string>();
 foreach (var pageUrl in allLinkedPages)
 {
-    var pageName = pageUrl.Remove(0, 1);
-    var doc = new HtmlDocument();
-    //if (pageUrl == "/history")
-    //{
-    var pageHtml = await CallUrl(pageUrl);
-    doc.LoadHtml(pageHtml);
-    var tocNodes = doc.DocumentNode.SelectNodes("//div[@id = 'toc-list']/div");
-    var hasToc = tocNodes != null && tocNodes?.Count > 0;
-
-    var page = new Page();
-
-    if (hasToc)
-    {
-        var toc = new TableOfContents { };
-        var entries = new List<TableOfContents.Entry>();
-        foreach (var n in tocNodes)
-        {
-            var style = n.GetAttributeValue("style", string.Empty);
-            style = style.Replace("margin-left: ", string.Empty);
-            style = style.Replace("em;", string.Empty);
-            _ = int.TryParse(style, out int level);
-            var a = n.ChildNodes.FirstOrDefault(x => x.Name == "a");
-            var title = a.InnerText;
-            var link = a.GetAttributeValue("href", string.Empty);
-
-            link = $"/l5r/{pageName}{link}";
-
-            var entry = new TableOfContents.Entry
-            {
-                Title = title,
-                Link = link
-            };
-            if (level <= 1)
-            {
-                entries.Add(entry);
-            }
-            else if (level == 2)
-            {
-                var last = entries.Last();
-                last.Children ??= new List<TableOfContents.Entry>();
-                last.Children.Add(entry);
-            }
-            else if (level == 3)
-            {
-                var last = entries.Last();
-                var lastChild = last.Children.Last();
-                lastChild.Children ??= new List<TableOfContents.Entry>();
-                lastChild.Children.Add(entry);
-            }
-            else
-            {
-                throw new NotImplementedException("Table of Contents Depth > 3 not supported");
-            }
-        }
-        toc.Entries = entries.ToArray();
-
-        page.TableOfContents = toc;
-
-
-    }
-
-    using var sw = new StringWriter();
-
-    //Nothing below "---" will attempt to be parsed by Statiq
-    sw.WriteLine("---");
-    var linkNodes = doc.DocumentNode.SelectNodes("//div[@id = 'page-content']/descendant::a");
-    if (linkNodes != null)
-    {
-        foreach (var a in linkNodes)
-        {
-            var link = a.GetAttributeValue("href", string.Empty);
-            if (link.StartsWith("/"))
-            {
-                a.SetAttributeValue("href", $"/l5r{link}");
-            }
-        }
-    }
-    
-    var pageContentNodes = doc.DocumentNode.SelectNodes("//div[@id = 'page-content']/*");
-    for (int i = 0; i < pageContentNodes.Count; i++)
-    {
-        var node = pageContentNodes[i];
-        var nodeName = node.Name;
-        if (i == 0 && nodeName == "table") continue;
-
-
-        var linePrefix = string.Empty;
-        var lineSuffix = string.Empty;
-
-        if (nodeName == "h1") linePrefix = "## ";
-        if (nodeName == "h2") linePrefix = "### ";
-        if (nodeName == "h3") linePrefix = "#### ";
-
-        if (nodeName == "ul")
-        {
-            foreach (var item in node.ChildNodes)
-            {
-                if (item.Name == "li")
-                {
-                    sw.WriteLine($"- {item.InnerHtml}");
-                }
-            }
-            sw.WriteLine();
-            continue;
-        }
-
-        if (nodeName == "table")
-        {
-            node.SetAttributeValue("class", "table");
-            var responsiveTableDiv = new XElement("div",
-                new XAttribute("class", "table-responsive"),
-                XElement.Parse(node.OuterHtml)
-            );
-            
-            sw.WriteLine();
-            sw.WriteLine(responsiveTableDiv);
-            sw.WriteLine();
-            continue;
-        }
-
-        if (nodeName == "p")
-        {
-            var childCount = node.ChildNodes?.Count() ?? 0;
-            if (childCount == 3)
-            {
-                if (node.ChildNodes[0].Name == "strong" 
-                    && node.ChildNodes[1].Name == "br"
-                    && node.ChildNodes[2].Name == "#text")
-                {
-
-                    sw.WriteLine($"##### {node.ChildNodes[0].InnerHtml}");
-                    sw.WriteLine($"{node.ChildNodes[2].InnerHtml}");
-                    continue;
-                }
-            }
-            
-            if (childCount > 3)
-            {
-                var firstIsDecoration = false;
-                if (node.ChildNodes[0].Name == "span")
-                {
-                    var style = node.ChildNodes[0].GetAttributeValue("style", string.Empty);
-                    if (style == "text-decoration: underline;")
-                    {
-                        firstIsDecoration = true;
-                    }
-                }
-                else if (node.ChildNodes[0].Name == "strong")
-                {
-                    firstIsDecoration = true;
-                }
-
-                if (firstIsDecoration)
-                {
-                    sw.WriteLine($"##### {node.ChildNodes[0].InnerHtml}");
-
-                    if (node.ChildNodes[0].InnerHtml.Contains("Chikushudo"))
-                    {
-                        
-                    }
-                    var remainingNodes = node.ChildNodes.ToList();
-                    remainingNodes.RemoveAt(0);
-                    foreach (var item in remainingNodes)
-                    {
-                        if (item.Name == "br")
-                        {
-                            continue;
-                        }
-                        if (item.Name == "strong")
-                        {
-                            sw.WriteLine($"###### {item.InnerHtml.TrimStart()}");
-                        }
-                        else
-                        {
-                            sw.WriteLine($"{item.OuterHtml}");
-                        }
-                    }
-                    continue;
-                }
-            }
-
-            if (childCount == 1)
-            {
-                if (node.ChildNodes[0].Name == "span")
-                {
-                    var style = node.ChildNodes[0].GetAttributeValue("style", string.Empty);
-                    if (style == "text-decoration: underline;")
-                    {
-                        sw.WriteLine($"###### {node.ChildNodes[0].InnerHtml}");
-                        continue;
-                    }
-                }
-
-                if (node.ChildNodes[0].Name == "strong")
-                {
-                    sw.WriteLine($"###### {node.ChildNodes[0].InnerHtml}");
-                    continue;
-                }
-                
-            }
-        }
-
-        if (pageName == "bushido" && nodeName == "blockquote")
-        {
-            var text = node.InnerText;
-            text = text.Replace("&quot;", string.Empty);
-            text = text.Replace("- Akodo's Leadership", string.Empty);
-
-            //sw.WriteLine("***");
-            sw.WriteLine(new XElement("figure",
-                new XAttribute("class", "text-center"),
-                new XElement("blockquote",
-                    new XAttribute("class", "blockquote"),
-                    new XElement("p", text)
-                ),
-                new XElement("figcaption",
-                    new XAttribute("class", "blockquote-footer"),
-                    "Kami Akodo in ",
-                    new XElement("cite",
-                        new XAttribute("title", "Leadership"),
-                        "Leadership"
-                    )
-                    
-                )
-            ));
-            sw.WriteLine();
-            //sw.WriteLine("***");
-            continue;
-        }
-
-
-        var rawId = node.GetAttributeValue("id", string.Empty);
-
-        if (rawId.Length > 0)
-        {
-            lineSuffix = $" {{#{rawId}}}";
-        }
-
-
-        sw.WriteLine($"{linePrefix}{node.InnerHtml}{lineSuffix}");
-        sw.WriteLine();
-
-    }
-
-
-
-    await WriteToOutputFolder($"_{pageName}.json", SerializeIndented(page));
-    await WriteToOutputFolder($"{pageName}.md", sw.ToString());
-
-    Console.WriteLine($"Scraped {pageUrl}");
-    Thread.Sleep(333);
-    //}
+    var linked = await ScrapePage(pageUrl);
+    discoveredPages = discoveredPages.Union(linked).ToList();
 }
 
 Console.WriteLine("Finished.");
+
+discoveredPages.Sort((x, y) => string.Compare(x, y));
+Console.WriteLine($"Pages link to {discoveredPages.Count()} other pages.");
+
+var newPages = discoveredPages.Except(allLinkedPages);
+Console.WriteLine($"{newPages.Count()} of which are new:");
+discoveredPages = new List<string>();
+foreach (var pageUrl in newPages)
+{
+    var linked = await ScrapePage(pageUrl);
+    discoveredPages = discoveredPages.Union(linked).ToList();
+}
+
+Console.WriteLine("Finished.");
+allLinkedPages = allLinkedPages.Union(newPages).ToList();
+
+discoveredPages.Sort((x, y) => string.Compare(x, y));
+Console.WriteLine($"New pages link to {discoveredPages.Count()} other pages.");
+
+newPages = discoveredPages.Except(allLinkedPages);
+Console.WriteLine($"{newPages.Count()} of which are new:");
+
+
+discoveredPages = new List<string>();
+foreach (var pageUrl in newPages)
+{
+    var linked = await ScrapePage(pageUrl);
+    discoveredPages = discoveredPages.Union(linked).ToList();
+}
+
+Console.WriteLine("Finished.");
+allLinkedPages = allLinkedPages.Union(newPages).ToList();
+
+discoveredPages.Sort((x, y) => string.Compare(x, y));
+Console.WriteLine($"New pages link to {discoveredPages.Count()} other pages.");
+
+newPages = discoveredPages.Except(allLinkedPages);
+Console.WriteLine($"{newPages.Count()} of which are new:");
 
 static async Task<string> CallUrl(string page = "")
 {
@@ -385,4 +172,270 @@ static async Task<List<string>> ScrapeSideMenu(HtmlDocument doc)
 
     await SerializeToOutputFolder("data/sideMenu.json", sideMenu);
     return linkedPages.Distinct().ToList();
+}
+
+static async Task<List<string>> ScrapePage(string pageUrl)
+{
+    Console.WriteLine($"Scraping {pageUrl}");
+    var linkedPages = new List<string>();
+
+    var pageName = pageUrl.Remove(0, 1);
+    var doc = new HtmlDocument();
+    //if (pageUrl == "/history")
+    //{
+    var pageHtml = await CallUrl(pageUrl);
+    doc.LoadHtml(pageHtml);
+    var tocNodes = doc.DocumentNode.SelectNodes("//div[@id = 'toc-list']/div");
+    var hasToc = tocNodes != null && tocNodes?.Count > 0;
+
+    var page = new Page();
+    try
+    {
+        if (hasToc)
+        {
+            var toc = new TableOfContents { };
+            var entries = new List<TableOfContents.Entry>();
+            foreach (var n in tocNodes)
+            {
+                var style = n.GetAttributeValue("style", string.Empty);
+                style = style.Replace("margin-left: ", string.Empty);
+                style = style.Replace("em;", string.Empty);
+                _ = int.TryParse(style, out int level);
+                var a = n.ChildNodes.FirstOrDefault(x => x.Name == "a");
+                var title = a.InnerText;
+                var link = a.GetAttributeValue("href", string.Empty);
+
+                link = $"/l5r/{pageName}{link}";
+
+                var entry = new TableOfContents.Entry
+                {
+                    Title = title,
+                    Link = link
+                };
+                if (level <= 1)
+                {
+                    entries.Add(entry);
+                }
+                else if (level == 2)
+                {
+                    var last = entries.Last();
+                    last.Children ??= new List<TableOfContents.Entry>();
+                    last.Children.Add(entry);
+                }
+                else if (level == 3)
+                {
+                    var last = entries.Last();
+                    var lastChild = last.Children.Last();
+                    lastChild.Children ??= new List<TableOfContents.Entry>();
+                    lastChild.Children.Add(entry);
+                }
+                else
+                {
+                    throw new NotImplementedException("Table of Contents Depth > 3 not supported");
+                }
+            }
+            toc.Entries = entries.ToArray();
+
+            page.TableOfContents = toc;
+        }
+    }
+    catch (System.Exception ex)
+    {
+        Console.WriteLine($"Unable to parse ToC: {ex.Message}");
+    }
+
+
+    using var sw = new StringWriter();
+
+    //Nothing below "---" will attempt to be parsed by Statiq
+    sw.WriteLine("---");
+    var linkNodes = doc.DocumentNode.SelectNodes("//div[@id = 'page-content']/descendant::a");
+    if (linkNodes != null)
+    {
+        foreach (var a in linkNodes)
+        {
+            var link = a.GetAttributeValue("href", string.Empty);
+            if (link.StartsWith("/"))
+            {
+                linkedPages.Add(link);
+                a.SetAttributeValue("href", $"/l5r{link}");
+            }
+        }
+    }
+
+    var pageContentNodes = doc.DocumentNode.SelectNodes("//div[@id = 'page-content']/*");
+    for (int i = 0; i < pageContentNodes.Count; i++)
+    {
+        var node = pageContentNodes[i];
+        var nodeName = node.Name;
+        if (i == 0 && nodeName == "table") continue;
+
+
+        var linePrefix = string.Empty;
+        var lineSuffix = string.Empty;
+
+        if (nodeName == "h1") linePrefix = "## ";
+        if (nodeName == "h2") linePrefix = "### ";
+        if (nodeName == "h3") linePrefix = "#### ";
+
+        if (nodeName == "ul")
+        {
+            foreach (var item in node.ChildNodes)
+            {
+                if (item.Name == "li")
+                {
+                    sw.WriteLine($"- {item.InnerHtml}");
+                }
+            }
+            sw.WriteLine();
+            continue;
+        }
+
+        if (nodeName == "table")
+        {
+            node.SetAttributeValue("class", "table");
+            var responsiveTableDiv = new XElement("div",
+                new XAttribute("class", "table-responsive"),
+                XElement.Parse(node.OuterHtml)
+            );
+
+            sw.WriteLine();
+            sw.WriteLine(responsiveTableDiv);
+            sw.WriteLine();
+            continue;
+        }
+
+        if (nodeName == "p")
+        {
+            var childCount = node.ChildNodes?.Count() ?? 0;
+            if (childCount == 3)
+            {
+                if (node.ChildNodes[0].Name == "strong"
+                    && node.ChildNodes[1].Name == "br"
+                    && node.ChildNodes[2].Name == "#text")
+                {
+
+                    sw.WriteLine($"##### {node.ChildNodes[0].InnerHtml}");
+                    sw.WriteLine($"{node.ChildNodes[2].InnerHtml}");
+                    continue;
+                }
+            }
+
+            if (childCount > 3)
+            {
+                var firstIsDecoration = false;
+                if (node.ChildNodes[0].Name == "span")
+                {
+                    var style = node.ChildNodes[0].GetAttributeValue("style", string.Empty);
+                    if (style == "text-decoration: underline;")
+                    {
+                        firstIsDecoration = true;
+                    }
+                }
+                else if (node.ChildNodes[0].Name == "strong")
+                {
+                    firstIsDecoration = true;
+                }
+
+                if (firstIsDecoration)
+                {
+                    sw.WriteLine($"##### {node.ChildNodes[0].InnerHtml}");
+
+                    if (node.ChildNodes[0].InnerHtml.Contains("Chikushudo"))
+                    {
+
+                    }
+                    var remainingNodes = node.ChildNodes.ToList();
+                    remainingNodes.RemoveAt(0);
+                    foreach (var item in remainingNodes)
+                    {
+                        if (item.Name == "br")
+                        {
+                            continue;
+                        }
+                        if (item.Name == "strong")
+                        {
+                            sw.WriteLine($"###### {item.InnerHtml.TrimStart()}");
+                        }
+                        else
+                        {
+                            sw.WriteLine($"{item.OuterHtml}");
+                        }
+                    }
+                    continue;
+                }
+            }
+
+            if (childCount == 1)
+            {
+                if (node.ChildNodes[0].Name == "span")
+                {
+                    var style = node.ChildNodes[0].GetAttributeValue("style", string.Empty);
+                    if (style == "text-decoration: underline;")
+                    {
+                        sw.WriteLine($"###### {node.ChildNodes[0].InnerHtml}");
+                        continue;
+                    }
+                }
+
+                if (node.ChildNodes[0].Name == "strong")
+                {
+                    sw.WriteLine($"###### {node.ChildNodes[0].InnerHtml}");
+                    continue;
+                }
+
+            }
+        }
+
+        if (pageName == "bushido" && nodeName == "blockquote")
+        {
+            var text = node.InnerText;
+            text = text.Replace("&quot;", string.Empty);
+            text = text.Replace("- Akodo's Leadership", string.Empty);
+
+            //sw.WriteLine("***");
+            sw.WriteLine(new XElement("figure",
+                new XAttribute("class", "text-center"),
+                new XElement("blockquote",
+                    new XAttribute("class", "blockquote"),
+                    new XElement("p", text)
+                ),
+                new XElement("figcaption",
+                    new XAttribute("class", "blockquote-footer"),
+                    "Kami Akodo in ",
+                    new XElement("cite",
+                        new XAttribute("title", "Leadership"),
+                        "Leadership"
+                    )
+
+                )
+            ));
+            sw.WriteLine();
+            //sw.WriteLine("***");
+            continue;
+        }
+
+
+        var rawId = node.GetAttributeValue("id", string.Empty);
+
+        if (rawId.Length > 0)
+        {
+            lineSuffix = $" {{#{rawId}}}";
+        }
+
+
+        sw.WriteLine($"{linePrefix}{node.InnerHtml}{lineSuffix}");
+        sw.WriteLine();
+
+    }
+
+
+
+    await WriteToOutputFolder($"_{pageName}.json", SerializeIndented(page));
+    await WriteToOutputFolder($"{pageName}.md", sw.ToString());
+
+    Console.WriteLine($"Scraped {pageUrl}");
+    Thread.Sleep(250);
+    //}
+    return linkedPages;
 }
