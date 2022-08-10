@@ -311,9 +311,9 @@ static async Task<List<string>> ScrapePage(string pageUrl)
             tocElement.Add(entryElement);
         }
 
-        sw.WriteLine();
-        sw.WriteLine(tocElement);
-        sw.WriteLine();
+        // sw.WriteLine();
+        // sw.WriteLine(tocElement);
+        // sw.WriteLine();
     }
 #endregion
 
@@ -497,6 +497,7 @@ static async Task<List<string>> ScrapePage(string pageUrl)
     }
 
     await WriteToOutputFolder($"{pageName}.md", sw.ToString());
+    await SerializeToOutputFolder($"_{pageName}.json", page);
 
     Console.WriteLine($"Scraped {pageUrl}");
     Thread.Sleep(250);
