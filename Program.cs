@@ -202,7 +202,7 @@ static async Task<List<string>> ScrapePage(string pageUrl)
                 var title = a.InnerText;
                 var link = a.GetAttributeValue("href", string.Empty);
 
-                link = $"/l5r/{pageName}{link}";
+                link = $"/{pageName}{link}";
 
                 var entry = new TableOfContents.Entry
                 {
@@ -312,7 +312,6 @@ static async Task<List<string>> ScrapePage(string pageUrl)
             if (link.StartsWith("/"))
             {
                 linkedPages.Add(link);
-                a.SetAttributeValue("href", $"/l5r{link}");
             }
         }
     }
