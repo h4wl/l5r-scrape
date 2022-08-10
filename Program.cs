@@ -173,10 +173,24 @@ static async Task<List<string>> ScrapeSideMenu(HtmlDocument doc)
 
 static async Task<List<string>> ScrapePage(string pageUrl)
 {
+    var pagesToSkip = new List<string>
+    {
+        "book-of-air",
+        "book-of-earth",
+        "book-of-fire",
+        "book-of-the-void",
+        "book-of-water"
+    };
     Console.WriteLine($"Scraping {pageUrl}");
     var linkedPages = new List<string>();
 
     var pageName = pageUrl.Remove(0, 1);
+    if (pagesToSkip.Contains(pageName))
+    {
+        Console.WriteLine($"Skipping {pageUrl}");
+        return new List<string>();
+    }
+
     var doc = new HtmlDocument();
     // if (pageUrl == "/history")
     // {
