@@ -228,7 +228,6 @@ static async Task<List<string>> ScrapePage(string pageUrl)
 
 
         var linePrefix = string.Empty;
-        var lineSuffix = string.Empty;
 
         if (nodeName == "h1") linePrefix = "## ";
         if (nodeName == "h2") linePrefix = "### ";
@@ -368,15 +367,7 @@ static async Task<List<string>> ScrapePage(string pageUrl)
         }
 
 
-        var rawId = node.GetAttributeValue("id", string.Empty);
-
-        if (rawId.Length > 0)
-        {
-            lineSuffix = $" {{#{rawId}}}";
-        }
-
-
-        sw.WriteLine($"{linePrefix}{node.InnerHtml}{lineSuffix}");
+        sw.WriteLine($"{linePrefix}{node.InnerHtml}");
         sw.WriteLine();
 
     }
