@@ -196,66 +196,7 @@ static async Task<List<string>> ScrapePage(string pageUrl)
     // {
     var pageHtml = await CallUrl(pageUrl);
     doc.LoadHtml(pageHtml);
-    var tocNodes = doc.DocumentNode.SelectNodes("//div[@id = 'toc-list']/div");
-    var hasToc = tocNodes != null && tocNodes?.Count > 0;
-
-    var page = new Page();
-    try
-    {
-        if (hasToc)
-        {
-            var toc = new TableOfContents { };
-            var entries = new List<TableOfContents.Entry>();
-            foreach (var n in tocNodes)
-            {
-                var style = n.GetAttributeValue("style", string.Empty);
-                style = style.Replace("margin-left: ", string.Empty);
-                style = style.Replace("em;", string.Empty);
-                _ = int.TryParse(style, out int level);
-                var a = n.ChildNodes.FirstOrDefault(x => x.Name == "a");
-                var title = a.InnerText;
-                var link = a.GetAttributeValue("href", string.Empty);
-
-                link = $"/{pageName}{link}";
-
-                var entry = new TableOfContents.Entry
-                {
-                    Title = title,
-                    Link = link
-                };
-                if (level <= 1)
-                {
-                    entries.Add(entry);
-                }
-                else if (level == 2)
-                {
-                    var last = entries.Last();
-                    last.Children ??= new List<TableOfContents.Entry>();
-                    last.Children.Add(entry);
-                }
-                else if (level == 3)
-                {
-                    var last = entries.Last();
-                    var lastChild = last.Children.Last();
-                    lastChild.Children ??= new List<TableOfContents.Entry>();
-                    lastChild.Children.Add(entry);
-                }
-                else
-                {
-                    throw new NotImplementedException("Table of Contents Depth > 3 not supported");
-                }
-            }
-            toc.Entries = entries.ToArray();
-
-            page.TableOfContents = toc;
-        }
-    }
-    catch (System.Exception ex)
-    {
-        Console.WriteLine($"Unable to parse ToC: {ex.Message}");
-    }
-
-
+    
     using var sw = new StringWriter();
 
     var titleNode = doc.DocumentNode.SelectSingleNode("//div[@id = 'page-title']");
@@ -264,58 +205,6 @@ static async Task<List<string>> ScrapePage(string pageUrl)
 
     //Nothing below "---" will attempt to be parsed by Statiq
     sw.WriteLine("---");
-
-#region ParseToC
-    if (page.TableOfContents?.Entries != null)
-    {
-        var tocElement = new XElement("ul");
-        foreach (var entry in page.TableOfContents.Entries)
-        {
-            var entryElement = new XElement("li",
-                new XElement("a",
-                    new XAttribute("href", entry.Link),
-                    entry.Title
-                )
-            );
-            if (entry.Children != null && entry.Children.Count() > 0)
-            {
-                var tocElement2 = new XElement("ul");
-                foreach (var entry2 in entry.Children)
-                {
-                    var entryElement2 = new XElement("li",
-                        new XElement("a",
-                            new XAttribute("href", entry2.Link),
-                            entry2.Title
-                        )
-                    );
-                    if (entry2.Children != null && entry2.Children.Count() > 0)
-                    {
-                        var tocElement3 = new XElement("ul");
-                        foreach (var entry3 in entry2.Children)
-                        {
-                            var entryElement3 = new XElement("li",
-                                new XElement("a",
-                                    new XAttribute("href", entry3.Link),
-                                    entry3.Title
-                                )
-                            );
-                            
-                            tocElement3.Add(entryElement3);
-                        }
-                        entryElement2.Add(tocElement3);
-                    }
-                    tocElement2.Add(entryElement2);
-                }
-                entryElement.Add(tocElement2);
-            }
-            tocElement.Add(entryElement);
-        }
-
-        // sw.WriteLine();
-        // sw.WriteLine(tocElement);
-        // sw.WriteLine();
-    }
-#endregion
 
     var linkNodes = doc.DocumentNode.SelectNodes("//div[@id = 'page-content']/descendant::a");
     if (linkNodes != null)
@@ -382,7 +271,7 @@ static async Task<List<string>> ScrapePage(string pageUrl)
                     && node.ChildNodes[2].Name == "#text")
                 {
 
-                    sw.WriteLine($"##### {node.ChildNodes[0].InnerHtml}");
+                    sw.WriteLine($"#### {node.ChildNodes[0].InnerHtml}");
                     sw.WriteLine($"{node.ChildNodes[2].InnerHtml}");
                     continue;
                 }
@@ -406,12 +295,8 @@ static async Task<List<string>> ScrapePage(string pageUrl)
 
                 if (firstIsDecoration)
                 {
-                    sw.WriteLine($"##### {node.ChildNodes[0].InnerHtml}");
+                    sw.WriteLine($"#### {node.ChildNodes[0].InnerHtml}");
 
-                    if (node.ChildNodes[0].InnerHtml.Contains("Chikushudo"))
-                    {
-
-                    }
                     var remainingNodes = node.ChildNodes.ToList();
                     remainingNodes.RemoveAt(0);
                     foreach (var item in remainingNodes)
@@ -422,7 +307,7 @@ static async Task<List<string>> ScrapePage(string pageUrl)
                         }
                         if (item.Name == "strong")
                         {
-                            sw.WriteLine($"###### {item.InnerHtml.TrimStart()}");
+                            sw.WriteLine($"#### {item.InnerHtml.TrimStart()}");
                         }
                         else
                         {
@@ -440,14 +325,14 @@ static async Task<List<string>> ScrapePage(string pageUrl)
                     var style = node.ChildNodes[0].GetAttributeValue("style", string.Empty);
                     if (style == "text-decoration: underline;")
                     {
-                        sw.WriteLine($"###### {node.ChildNodes[0].InnerHtml}");
+                        sw.WriteLine($"## {node.ChildNodes[0].InnerHtml}");
                         continue;
                     }
                 }
 
                 if (node.ChildNodes[0].Name == "strong")
                 {
-                    sw.WriteLine($"###### {node.ChildNodes[0].InnerHtml}");
+                    sw.WriteLine($"### {node.ChildNodes[0].InnerHtml}");
                     continue;
                 }
 
@@ -497,7 +382,6 @@ static async Task<List<string>> ScrapePage(string pageUrl)
     }
 
     await WriteToOutputFolder($"{pageName}.md", sw.ToString());
-    await SerializeToOutputFolder($"_{pageName}.json", page);
 
     Console.WriteLine($"Scraped {pageUrl}");
     Thread.Sleep(250);
